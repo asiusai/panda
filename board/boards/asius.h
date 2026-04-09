@@ -146,15 +146,15 @@ static void asius__siren_set(bool enabled) {
   }
 }
 
-// PDM mic capture via DFSDM1 (PE4=DATIN3, PE9=CKOUT)
-// Captures into mic_rx_buf, ~48kHz 24-bit samples
+// PDM mic capture via DFSDM1 (PD9=DATIN3, PD10=CKOUT)
+// Same channels as cuatro — no DFSDM register changes needed
 // TODO: transport mic data to SOM over SPI/USB
 __attribute__((section(".sram4"))) static uint32_t asius_mic_rx_buf[2][512];
 
 static void asius__mic_init(void) {
   // GPIO setup
-  set_gpio_alternate(GPIOE, 4, GPIO_AF3_DFSDM1);  // DFSDM1_DATIN3
-  set_gpio_alternate(GPIOE, 9, GPIO_AF3_DFSDM1);  // DFSDM1_CKOUT
+  set_gpio_alternate(GPIOD, 9, GPIO_AF3_DFSDM1);  // DFSDM1_DATIN3
+  set_gpio_alternate(GPIOD, 10, GPIO_AF3_DFSDM1);  // DFSDM1_CKOUT
 
   // DFSDM clock output on channel 0, mic data on channel 3
   register_set(&DFSDM1_Channel0->CHCFGR1, (90UL << DFSDM_CHCFGR1_CKOUTDIV_Pos) | DFSDM_CHCFGR1_CHEN, 0xC0FFF1EFU);
@@ -213,7 +213,7 @@ static void asius__init(void) {
   // Amp off by default (PAM8302A on PD7, audio input on PA4)
   asius__set_amp_enabled(false);
 
-  // PDM mic (PE4=DATIN3, PE9=CKOUT)
+  // PDM mic (PD9=DATIN3, PD10=CKOUT)
   asius__mic_init();
 }
 
