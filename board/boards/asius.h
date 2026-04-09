@@ -285,7 +285,7 @@ static harness_configuration asius__harness_config = {
   .adc_signal_SBU2 = ADC_CHANNEL_DEFAULT(ADC1, 17)
 };
 
-board board_asius_ = {
+board board_asius = {
   .harness_config = &asius__harness_config,
   .has_spi = true,
   .has_fan = false,
