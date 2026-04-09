@@ -57,7 +57,8 @@ void clock_init(void) {
   */
 
   // Set power mode to direct SMPS power supply (depends on the board layout)
-  PackageSMPSType package_smps = get_package_smps_type();
+  // Asius uses H725 in TFBGA100 with SMPS, override package detection
+  PackageSMPSType package_smps = (hw_type == HW_TYPE_ASIUS) ? PACKAGE_WITH_SMPS : get_package_smps_type();
   if (package_smps == PACKAGE_WITHOUT_SMPS) {
     register_set(&(PWR->CR3), PWR_CR3_LDOEN, 0xFU); // no SMPS, so powered by LDO
   } else if (package_smps == PACKAGE_WITH_SMPS) {
