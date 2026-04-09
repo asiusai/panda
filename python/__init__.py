@@ -134,6 +134,7 @@ class Panda:
   HW_TYPE_RED_PANDA = b'\x07'
   HW_TYPE_TRES = b'\x09'
   HW_TYPE_CUATRO = b'\x0a'
+  HW_TYPE_ASIUS = b'\x0b'
   HW_TYPE_BODY = b'\xb1'
 
   CAN_PACKET_VERSION = compute_version_hash(os.path.join(opendbc.INCLUDE_PATH, "opendbc/safety/can.h"))
@@ -141,10 +142,10 @@ class Panda:
   HEALTH_STRUCT = _parse_c_struct(os.path.join(BASEDIR, "board/health.h"), "health_t")
   CAN_HEALTH_STRUCT = struct.Struct("<BIBBBBBBBBIIIIIIIHHBBBIIII")
 
-  H7_DEVICES = [HW_TYPE_RED_PANDA, HW_TYPE_TRES, HW_TYPE_CUATRO, HW_TYPE_BODY]
+  H7_DEVICES = [HW_TYPE_RED_PANDA, HW_TYPE_TRES, HW_TYPE_CUATRO, HW_TYPE_ASIUS, HW_TYPE_BODY]
   SUPPORTED_DEVICES = H7_DEVICES
 
-  INTERNAL_DEVICES = (HW_TYPE_TRES, HW_TYPE_CUATRO)
+  INTERNAL_DEVICES = (HW_TYPE_TRES, HW_TYPE_CUATRO, HW_TYPE_ASIUS)
 
   HARNESS_STATUS_NC = 0
   HARNESS_STATUS_NORMAL = 1
@@ -787,8 +788,9 @@ class Panda:
     return a[0]
 
   # ****************** Siren *****************
-  def set_siren(self, enabled):
-    self._handle.controlWrite(Panda.REQUEST_OUT, 0xf6, int(enabled), 0, b'')
+  def set_siren(self, enabled, sound_id=1):
+    # sound_id: 0=off, 1=engage, 2=disengage, 3=prompt, 4=refuse, 5=warning_soft, 6=warning_imm
+    self._handle.controlWrite(Panda.REQUEST_OUT, 0xf6, sound_id if enabled else 0, 0, b'')
 
   # ****************** Debug *****************
 

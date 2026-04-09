@@ -300,9 +300,10 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
         heartbeat_engaged = (req->param1 == 1U);
         break;
       }
-    // **** 0xf6: set siren enabled
+    // **** 0xf6: set siren enabled (param1=sound_id: 0=off, 1=engage, 2=disengage, 3=prompt, 4=refuse, 5=warning)
     case 0xf6:
       siren_enabled = (req->param1 != 0U);
+      siren_sound_id = req->param1;
       break;
     // **** 0xf8: disable heartbeat checks
     case 0xf8:

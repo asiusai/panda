@@ -12,3 +12,4 @@ bool heartbeat_disabled = false;            // set over USB
 
 // siren state
 bool siren_enabled = false;
+uint8_t siren_sound_id = 0U;

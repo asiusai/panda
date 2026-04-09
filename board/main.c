@@ -123,7 +123,7 @@ static void tick_handler(void) {
   if (TICK_TIMER->SR != 0U) {
 
     // siren
-    current_board->set_siren((loop_counter & 1U) && (siren_enabled || (siren_countdown > 0U)));
+    current_board->set_siren(siren_enabled || (siren_countdown > 0U));
 
     // tick drivers at 8Hz
     fan_tick();

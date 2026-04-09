@@ -22,6 +22,7 @@ typedef void (*board_set_siren)(bool enabled);
 typedef void (*board_set_bootkick)(BootState state);
 typedef bool (*board_read_som_gpio)(void);
 typedef void (*board_set_amp_enabled)(bool enabled);
+typedef void (*board_set_led)(uint8_t color, bool enabled);
 
 struct board {
   harness_configuration *harness_config;
@@ -44,6 +45,7 @@ struct board {
   board_set_bootkick set_bootkick;
   board_read_som_gpio read_som_gpio;
   board_set_amp_enabled set_amp_enabled;
+  board_set_led set_led;  // NULL = use default GPIO/PWM
 };
 
 // ******************* Definitions ********************
