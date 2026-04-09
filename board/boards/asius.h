@@ -146,6 +146,37 @@ static void asius__siren_set(bool enabled) {
   }
 }
 
+// PDM mic capture via DFSDM1 (PE4=DATIN3, PE9=CKOUT)
+// Captures into mic_rx_buf, ~48kHz 24-bit samples
+// TODO: transport mic data to SOM over SPI/USB
+__attribute__((section(".sram4"))) static uint32_t asius_mic_rx_buf[2][512];
+
+static void asius__mic_init(void) {
+  // GPIO setup
+  set_gpio_alternate(GPIOE, 4, GPIO_AF3_DFSDM1);  // DFSDM1_DATIN3
+  set_gpio_alternate(GPIOE, 9, GPIO_AF3_DFSDM1);  // DFSDM1_CKOUT
+
+  // DFSDM clock output on channel 0, mic data on channel 3
+  register_set(&DFSDM1_Channel0->CHCFGR1, (90UL << DFSDM_CHCFGR1_CKOUTDIV_Pos) | DFSDM_CHCFGR1_CHEN, 0xC0FFF1EFU);
+  register_set(&DFSDM1_Channel3->CHCFGR1, (0b01UL << DFSDM_CHCFGR1_SPICKSEL_Pos) | (0b00U << DFSDM_CHCFGR1_SITP_Pos) | DFSDM_CHCFGR1_CHEN, 0x0000F1EFU);
+  register_set(&DFSDM1_Filter0->FLTFCR, (0U << DFSDM_FLTFCR_IOSR_Pos) | (54UL << DFSDM_FLTFCR_FOSR_Pos) | (4UL << DFSDM_FLTFCR_FORD_Pos), 0xE3FF00FFU);
+  register_set(&DFSDM1_Filter0->FLTCR1, DFSDM_FLTCR1_FAST | (3UL << DFSDM_FLTCR1_RCH_Pos) | DFSDM_FLTCR1_RDMAEN | DFSDM_FLTCR1_RCONT | DFSDM_FLTCR1_DFEN, 0x672E7F3BU);
+
+  // DMA (DFSDM1 -> memory, double buffer, circular)
+  register_set(&DMA1_Stream0->PAR, (uint32_t)&DFSDM1_Filter0->FLTRDATAR, 0xFFFFFFFFU);
+  register_set(&DMA1_Stream0->M0AR, (uint32_t)asius_mic_rx_buf[0], 0xFFFFFFFFU);
+  register_set(&DMA1_Stream0->M1AR, (uint32_t)asius_mic_rx_buf[1], 0xFFFFFFFFU);
+  DMA1_Stream0->NDTR = 512U;
+  register_set(&DMA1_Stream0->CR, DMA_SxCR_DBM | (0b10UL << DMA_SxCR_MSIZE_Pos) | (0b10UL << DMA_SxCR_PSIZE_Pos) | DMA_SxCR_MINC | DMA_SxCR_CIRC, 0x01F7FFFFU);
+  register_set(&DMAMUX1_Channel0->CCR, 101U, DMAMUX_CxCR_DMAREQ_ID_Msk); // DFSDM1_DMA0
+  register_set_bits(&DMA1_Stream0->CR, DMA_SxCR_EN);
+  DMA1->LIFCR |= 0x7DU;
+
+  // Start DFSDM conversion
+  register_set_bits(&DFSDM1_Channel0->CHCFGR1, DFSDM_CHCFGR1_DFSDMEN);
+  DFSDM1_Filter0->FLTCR1 |= DFSDM_FLTCR1_RSWSTART;
+}
+
 static void asius__init(void) {
   common_init_gpio();
 
@@ -181,6 +212,9 @@ static void asius__init(void) {
 
   // Amp off by default (PAM8302A on PD7, audio input on PA4)
   asius__set_amp_enabled(false);
+
+  // PDM mic (PE4=DATIN3, PE9=CKOUT)
+  asius__mic_init();
 }
 
 
