@@ -213,6 +213,14 @@ static void asius__init(void) {
   // Amp off by default (PAM8302A on PD7, audio input on PA4)
   asius__set_amp_enabled(false);
 
+  // IMU (LSM6DS3TR-C) on I2C5: PC10=SDA, PC11=SCL, PC9=INT1
+  // TODO: I2C driver + read at 104Hz + transport over SPI/USB
+  set_gpio_alternate(GPIOC, 10, GPIO_AF4_I2C5);  // I2C5_SDA
+  set_gpio_alternate(GPIOC, 11, GPIO_AF4_I2C5);  // I2C5_SCL
+  register_set_bits(&(GPIOC->OTYPER), GPIO_OTYPER_OT10 | GPIO_OTYPER_OT11);  // open drain for I2C
+  set_gpio_mode(GPIOC, 9, MODE_INPUT);  // INT1 (EXTI)
+  set_gpio_pullup(GPIOC, 9, PULL_NONE);  // INT1 active-high, no pull needed
+
   // PDM mic (PD9=DATIN3, PD10=CKOUT)
   asius__mic_init();
 }
