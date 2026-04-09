@@ -15,6 +15,7 @@
 #include "board/boards/red.h"
 #include "board/boards/tres.h"
 #include "board/boards/cuatro.h"
+#include "board/boards/asius.h"
 
 
 void detect_board_type(void) {
@@ -29,7 +30,11 @@ void detect_board_type(void) {
                      (detect_with_pull(GPIOD, 6, PULL_UP) << 2U) |
                      (detect_with_pull(GPIOD, 7, PULL_UP) << 3U);
 
-  if (id2 == 3U) {
+  if (id2 == 12U) {
+    // PD4=GND, PD5=GND, PD6=float, PD7=float
+    hw_type = HW_TYPE_ASIUS;
+    current_board = &board_asius;
+  } else if (id2 == 3U) {
     hw_type = HW_TYPE_CUATRO;
     current_board = &board_cuatro;
   } else if (id1 == 0U) {
