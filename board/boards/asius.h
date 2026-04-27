@@ -123,6 +123,7 @@ void DMA1_Stream1_IRQ_Handler(void) {
     DMA1->LIFCR = DMA_LIFCR_CTCIF1;
     if (siren_dma_remaining > 0U) {
       siren_dma_load_chunk();
+      DAC1->SR = DAC_SR_DMAUDR1;
     } else {
       siren_dma_done = true;
     }
@@ -139,10 +140,13 @@ static void asius__siren_tim_init(void) {
 }
 
 static void asius__siren_dac_init(void) {
+  // HFSEL=01 for AHB 80-160MHz (ours is 120MHz), MODE=000 (external pin, buffer enabled)
+  register_set(&DAC1->MCR, (0b01U << 8), 0xFFFFFFFFU);
   DAC1->DHR12R1 = 2048U;
-  register_set(&DAC1->MCR, 0U, 0xFFFFFFFFU);
   register_set(&DAC1->CR, DAC_CR_TEN1 | (6U << DAC_CR_TSEL1_Pos) | DAC_CR_DMAEN1, 0xFFFFFFFFU);
   register_set_bits(&DAC1->CR, DAC_CR_EN1);
+  // Clear any DMA underrun flag
+  DAC1->SR = DAC_SR_DMAUDR1;
 }
 
 static void asius__siren_dma_init(const uint16_t *data, uint32_t len) {
@@ -161,6 +165,7 @@ static void asius__siren_set(bool enabled) {
   static bool initialized = false;
   static bool started = false;
   static bool played = false;
+  static uint8_t last_sound_id = 0U;
 
   if (!initialized) {
     asius__siren_tim_init();
@@ -170,14 +175,21 @@ static void asius__siren_set(bool enabled) {
   }
 
   if (enabled && siren_sound_id > 0U && siren_sound_id < OP_SOUNDS_COUNT) {
+    if (siren_sound_id != last_sound_id) {
+      played = false;
+      last_sound_id = siren_sound_id;
+    }
     if (!started && !played) {
       register_clear_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
       while ((DMA1_Stream1->CR & DMA_SxCR_EN) != 0U) {}
       DMA1->LIFCR = (0x3FU << 6);
-      TIM7->CR1 |= TIM_CR1_CEN;
+      // DAC + DMA ready before TIM7 starts, to avoid DMAUDR1
       asius__siren_dac_init();
       asius__siren_dma_init(op_sounds[siren_sound_id].data, op_sounds[siren_sound_id].len);
       current_board->set_amp_enabled(true);
+      TIM7->CNT = 0U;
+      DAC1->SR = DAC_SR_DMAUDR1;
+      TIM7->CR1 |= TIM_CR1_CEN;
       started = true;
     }
     if (started && siren_dma_done) {

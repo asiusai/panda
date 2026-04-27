@@ -4,7 +4,7 @@ import struct
 import sys
 import os
 
-AMPLITUDE = 0.25
+AMPLITUDE = 0.40
 FADE_FRACTION = 0.10  # fade out last 10%
 
 SOUNDS = [
@@ -45,14 +45,18 @@ def read_wav_mono_16bit(path):
 
 
 def convert(samples):
+    import random
+    random.seed(42)
     n = len(samples)
     fade_start = int(n * (1.0 - FADE_FRACTION))
     out = []
+    # TPDF dithering: triangular probability density, ±1 LSB
     for i, s in enumerate(samples):
         v = s / 32768.0 * AMPLITUDE
         if i >= fade_start:
             v *= 1.0 - (i - fade_start) / (n - fade_start)
-        dac = int(v * 2048.0 + 2048.0)
+        dither = (random.random() - 0.5) + (random.random() - 0.5)
+        dac = int(v * 2048.0 + 2048.0 + dither)
         out.append(max(0, min(4095, dac)))
     return out
 
