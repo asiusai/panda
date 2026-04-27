@@ -1,56 +1,66 @@
 #pragma once
 
 #include "board_declarations.h"
-#include "board/drivers/sound_data.h"
+#ifndef BOOTSTUB
+#include "board/obj/sound_data.h"
+#endif
 
 // ////////////////////////// //
 // ASIUS (STM32H7) + Harness //
 // ////////////////////////// //
 
-// WS2812B on PB1 — bit-bang at 240MHz CPU
+// WS2812B on PB1 — bit-bang using DWT cycle counter at 240MHz CPU
 #define WS2812B_PIN 1U
 #define WS2812B_PORT GPIOB
 #define WS2812B_SET (1U << WS2812B_PIN)
 #define WS2812B_RST (1U << (WS2812B_PIN + 16U))
 
-// Delay loop calibrated for 240MHz: ~4 cycles per iteration
-static void ws2812b_delay(uint32_t n) {
-  for (volatile uint32_t i = 0U; i < n; i++) {}
+// WS2812B-2020 V1.3 timing (240MHz = 4.167ns/cycle)
+#define WS2812B_T0H  72U   // 300ns  (spec: 220-380ns)
+#define WS2812B_T0L  168U  // 700ns  (spec: 580-1000ns)
+#define WS2812B_T1H  168U  // 700ns  (spec: 580-1000ns)
+#define WS2812B_T1L  72U   // 300ns  (spec: 220-380ns)
+
+static void ws2812b_init_dwt(void) {
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0U;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
 static void ws2812b_send_byte(uint8_t byte) {
   for (int8_t bit = 7; bit >= 0; bit--) {
-    if ((byte >> bit) & 1U) {
-      // T1H ~0.8µs, T1L ~0.45µs
-      WS2812B_PORT->BSRR = WS2812B_SET;
-      ws2812b_delay(38U);
-      WS2812B_PORT->BSRR = WS2812B_RST;
-      ws2812b_delay(18U);
-    } else {
-      // T0H ~0.4µs, T0L ~0.85µs
-      WS2812B_PORT->BSRR = WS2812B_SET;
-      ws2812b_delay(16U);
-      WS2812B_PORT->BSRR = WS2812B_RST;
-      ws2812b_delay(40U);
-    }
+    uint32_t t_high = ((byte >> bit) & 1U) ? WS2812B_T1H : WS2812B_T0H;
+    uint32_t t_low = ((byte >> bit) & 1U) ? WS2812B_T1L : WS2812B_T0L;
+    uint32_t start;
+
+    WS2812B_PORT->BSRR = WS2812B_SET;
+    start = DWT->CYCCNT;
+    while ((DWT->CYCCNT - start) < t_high) {}
+
+    WS2812B_PORT->BSRR = WS2812B_RST;
+    start = DWT->CYCCNT;
+    while ((DWT->CYCCNT - start) < t_low) {}
   }
 }
 
-static uint8_t ws2812b_rgb[3] = {0U, 0U, 0U}; // R, G, B state
+static uint8_t ws2812b_rgb[3] = {0U, 0U, 0U};
 
 static void ws2812b_update(void) {
+  static bool dwt_ready = false;
+  if (!dwt_ready) {
+    ws2812b_init_dwt();
+    dwt_ready = true;
+  }
   __disable_irq();
-  // WS2812B expects GRB order
   ws2812b_send_byte(ws2812b_rgb[1]); // G
   ws2812b_send_byte(ws2812b_rgb[0]); // R
   ws2812b_send_byte(ws2812b_rgb[2]); // B
   __enable_irq();
-  // Reset: >50µs low (pin already low after last bit)
-  ws2812b_delay(500U);
+  uint32_t start = DWT->CYCCNT;
+  while ((DWT->CYCCNT - start) < 72000U) {} // reset >300µs
 }
 
-// LED brightness (WS2812B is bright, keep it low)
-#define WS2812B_BRIGHTNESS 8U
+#define WS2812B_BRIGHTNESS 32U
 
 static void asius__set_led(uint8_t color, bool enabled) {
   ws2812b_rgb[color] = enabled ? WS2812B_BRIGHTNESS : 0U;
@@ -88,14 +98,44 @@ static void asius__set_amp_enabled(bool enabled) {
   set_gpio_output(GPIOD, 7, enabled);
 }
 
+#ifndef BOOTSTUB
+// DMA1_Stream1 NDTR is 16-bit (max 65535). Sounds longer than that need chaining via TC interrupt.
+static const uint16_t *siren_dma_next;
+static uint32_t siren_dma_remaining;
+static volatile bool siren_dma_done;
+
+#define SIREN_DMA_MAX 65535U
+
+static void siren_dma_load_chunk(void) {
+  register_clear_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
+  while ((DMA1_Stream1->CR & DMA_SxCR_EN) != 0U) {}
+  DMA1->LIFCR = (0x3FU << 6);
+  register_set(&DMA1_Stream1->M0AR, (uint32_t)siren_dma_next, 0xFFFFFFFFU);
+  uint32_t chunk = (siren_dma_remaining > SIREN_DMA_MAX) ? SIREN_DMA_MAX : siren_dma_remaining;
+  DMA1_Stream1->NDTR = (uint16_t)chunk;
+  siren_dma_next += chunk;
+  siren_dma_remaining -= chunk;
+  register_set_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
+}
+
+void DMA1_Stream1_IRQ_Handler(void) {
+  if ((DMA1->LISR & DMA_LISR_TCIF1) != 0U) {
+    DMA1->LIFCR = DMA_LIFCR_CTCIF1;
+    if (siren_dma_remaining > 0U) {
+      siren_dma_load_chunk();
+    } else {
+      siren_dma_done = true;
+    }
+  }
+  DMA1->LIFCR = (0x3FU << 6);
+}
+
 static void asius__siren_tim_init(void) {
-  // 48kHz sample rate: 120MHz / (2499+1) = 48kHz
   register_set(&TIM7->PSC, 0U, 0xFFFFU);
   register_set(&TIM7->ARR, 2499U, 0xFFFFU);
   register_set(&TIM7->CR2, (0b10U << TIM_CR2_MMS_Pos), TIM_CR2_MMS_Msk);
   register_set(&TIM7->CR1, TIM_CR1_ARPE | TIM_CR1_URS, 0x088EU);
   TIM7->SR = 0U;
-  TIM7->CR1 |= TIM_CR1_CEN;
 }
 
 static void asius__siren_dac_init(void) {
@@ -108,74 +148,82 @@ static void asius__siren_dac_init(void) {
 static void asius__siren_dma_init(const uint16_t *data, uint32_t len) {
   register_set(&DMAMUX1_Channel1->CCR, 67U, DMAMUX_CxCR_DMAREQ_ID_Msk);
   register_set(&DMA1_Stream1->PAR, (uint32_t)&(DAC1->DHR12R1), 0xFFFFFFFFU);
-  register_set(&DMA1_Stream1->M0AR, (uint32_t)data, 0xFFFFFFFFU);
   register_set(&DMA1_Stream1->FCR, 0U, 0x00000083U);
-  DMA1_Stream1->NDTR = len;
-  // 16-bit memory, 16-bit peripheral, one-shot
-  DMA1_Stream1->CR = (0b11UL << DMA_SxCR_PL_Pos) | (0b01UL << DMA_SxCR_MSIZE_Pos) | (0b01UL << DMA_SxCR_PSIZE_Pos) | DMA_SxCR_MINC | (1U << DMA_SxCR_DIR_Pos);
+  siren_dma_next = data;
+  siren_dma_remaining = len;
+  siren_dma_done = false;
+  DMA1_Stream1->CR = (0b11UL << DMA_SxCR_PL_Pos) | (0b01UL << DMA_SxCR_MSIZE_Pos) | (0b01UL << DMA_SxCR_PSIZE_Pos) | DMA_SxCR_MINC | (1U << DMA_SxCR_DIR_Pos) | DMA_SxCR_TCIE;
+  siren_dma_load_chunk();
 }
 
+// called at 8Hz from tick_handler
 static void asius__siren_set(bool enabled) {
   static bool initialized = false;
   static bool started = false;
+  static bool played = false;
 
   if (!initialized) {
     asius__siren_tim_init();
+    REGISTER_INTERRUPT(DMA1_Stream1_IRQn, DMA1_Stream1_IRQ_Handler, 128U, FAULT_INTERRUPT_RATE_SOUND_DMA)
+    NVIC_EnableIRQ(DMA1_Stream1_IRQn);
     initialized = true;
   }
 
   if (enabled && siren_sound_id > 0U && siren_sound_id < OP_SOUNDS_COUNT) {
-    if (!started) {
+    if (!started && !played) {
       register_clear_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
       while ((DMA1_Stream1->CR & DMA_SxCR_EN) != 0U) {}
       DMA1->LIFCR = (0x3FU << 6);
+      TIM7->CR1 |= TIM_CR1_CEN;
       asius__siren_dac_init();
       asius__siren_dma_init(op_sounds[siren_sound_id].data, op_sounds[siren_sound_id].len);
       current_board->set_amp_enabled(true);
-      register_set_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
       started = true;
+    }
+    if (started && siren_dma_done) {
+      current_board->set_amp_enabled(false);
+      register_clear_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
+      DMA1->LIFCR = (0x3FU << 6);
+      register_clear_bits(&DAC1->CR, DAC_CR_DMAEN1 | DAC_CR_TEN1 | DAC_CR_EN1);
+      TIM7->CR1 &= ~TIM_CR1_CEN;
+      started = false;
+      played = true;
     }
   } else {
     if (started) {
       current_board->set_amp_enabled(false);
       register_clear_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
       DMA1->LIFCR = (0x3FU << 6);
-      DAC1->DHR12R1 = 2048U;
+      register_clear_bits(&DAC1->CR, DAC_CR_DMAEN1 | DAC_CR_TEN1 | DAC_CR_EN1);
+      TIM7->CR1 &= ~TIM_CR1_CEN;
       started = false;
     }
+    played = false;
   }
 }
 
-// PDM mic capture via DFSDM1 (PD9=DATIN3, PD10=CKOUT)
-// Same channels as cuatro — no DFSDM register changes needed
-// TODO: transport mic data to SOM over SPI/USB
-__attribute__((section(".sram4"))) static uint32_t asius_mic_rx_buf[2][512];
-
 static void asius__mic_init(void) {
-  // GPIO setup
-  set_gpio_alternate(GPIOD, 9, GPIO_AF3_DFSDM1);  // DFSDM1_DATIN3
-  set_gpio_alternate(GPIOD, 10, GPIO_AF3_DFSDM1);  // DFSDM1_CKOUT
+  set_gpio_alternate(GPIOD, 9, GPIO_AF3_DFSDM1);
+  set_gpio_alternate(GPIOD, 10, GPIO_AF3_DFSDM1);
 
-  // DFSDM clock output on channel 0, mic data on channel 3
   register_set(&DFSDM1_Channel0->CHCFGR1, (90UL << DFSDM_CHCFGR1_CKOUTDIV_Pos) | DFSDM_CHCFGR1_CHEN, 0xC0FFF1EFU);
   register_set(&DFSDM1_Channel3->CHCFGR1, (0b01UL << DFSDM_CHCFGR1_SPICKSEL_Pos) | (0b00U << DFSDM_CHCFGR1_SITP_Pos) | DFSDM_CHCFGR1_CHEN, 0x0000F1EFU);
   register_set(&DFSDM1_Filter0->FLTFCR, (0U << DFSDM_FLTFCR_IOSR_Pos) | (54UL << DFSDM_FLTFCR_FOSR_Pos) | (4UL << DFSDM_FLTFCR_FORD_Pos), 0xE3FF00FFU);
   register_set(&DFSDM1_Filter0->FLTCR1, DFSDM_FLTCR1_FAST | (3UL << DFSDM_FLTCR1_RCH_Pos) | DFSDM_FLTCR1_RDMAEN | DFSDM_FLTCR1_RCONT | DFSDM_FLTCR1_DFEN, 0x672E7F3BU);
 
-  // DMA (DFSDM1 -> memory, double buffer, circular)
   register_set(&DMA1_Stream0->PAR, (uint32_t)&DFSDM1_Filter0->FLTRDATAR, 0xFFFFFFFFU);
-  register_set(&DMA1_Stream0->M0AR, (uint32_t)asius_mic_rx_buf[0], 0xFFFFFFFFU);
-  register_set(&DMA1_Stream0->M1AR, (uint32_t)asius_mic_rx_buf[1], 0xFFFFFFFFU);
+  register_set(&DMA1_Stream0->M0AR, (uint32_t)mic_rx_buf[0], 0xFFFFFFFFU);
+  register_set(&DMA1_Stream0->M1AR, (uint32_t)mic_rx_buf[1], 0xFFFFFFFFU);
   DMA1_Stream0->NDTR = 512U;
   register_set(&DMA1_Stream0->CR, DMA_SxCR_DBM | (0b10UL << DMA_SxCR_MSIZE_Pos) | (0b10UL << DMA_SxCR_PSIZE_Pos) | DMA_SxCR_MINC | DMA_SxCR_CIRC, 0x01F7FFFFU);
-  register_set(&DMAMUX1_Channel0->CCR, 101U, DMAMUX_CxCR_DMAREQ_ID_Msk); // DFSDM1_DMA0
+  register_set(&DMAMUX1_Channel0->CCR, 101U, DMAMUX_CxCR_DMAREQ_ID_Msk);
   register_set_bits(&DMA1_Stream0->CR, DMA_SxCR_EN);
   DMA1->LIFCR |= 0x7DU;
 
-  // Start DFSDM conversion
   register_set_bits(&DFSDM1_Channel0->CHCFGR1, DFSDM_CHCFGR1_DFSDMEN);
   DFSDM1_Filter0->FLTCR1 |= DFSDM_FLTCR1_RSWSTART;
 }
+#endif
 
 static void asius__init(void) {
   common_init_gpio();
@@ -210,7 +258,6 @@ static void asius__init(void) {
   // Clock source
   clock_source_init(true);
 
-  // Amp off by default (PAM8302A on PD7, audio input on PA4)
   asius__set_amp_enabled(false);
 
   // IMU (LSM6DS3TR-C) on I2C5: PC10=SDA, PC11=SCL, PC9=INT1
@@ -221,8 +268,10 @@ static void asius__init(void) {
   set_gpio_mode(GPIOC, 9, MODE_INPUT);  // INT1 (EXTI)
   set_gpio_pullup(GPIOC, 9, PULL_NONE);  // INT1 active-high, no pull needed
 
+#ifndef BOOTSTUB
   // PDM mic (PD9=DATIN3, PD10=CKOUT)
   asius__mic_init();
+#endif
 }
 
 
@@ -302,7 +351,11 @@ board board_asius = {
   .read_current_mA = unused_read_current,
   .set_fan_enabled = unused_set_fan_enabled,
   .set_ir_power = unused_set_ir_power,
+#ifndef BOOTSTUB
   .set_siren = asius__siren_set,
+#else
+  .set_siren = unused_set_siren,
+#endif
   .set_bootkick = asius__set_bootkick,
   .read_som_gpio = asius_read_som_gpio,
   .set_amp_enabled = asius__set_amp_enabled,

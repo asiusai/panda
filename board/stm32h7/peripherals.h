@@ -10,7 +10,7 @@ static void gpio_usb_init(void) {
 }
 
 void gpio_spi_init(void) {
-  if (hw_type == HW_TYPE_ASIUS) {
+  if (hw_type == 11U) { // HW_TYPE_ASIUS
     // SPI4 on alternate PE pins: PE2=SCK, PE4=NSS, PE5=MISO, PE6=MOSI
     set_gpio_alternate(GPIOE, 2, GPIO_AF5_SPI4);
     set_gpio_alternate(GPIOE, 4, GPIO_AF5_SPI4);

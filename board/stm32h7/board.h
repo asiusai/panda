@@ -31,9 +31,14 @@ void detect_board_type(void) {
                      (detect_with_pull(GPIOD, 7, PULL_UP) << 3U);
 
   if (id2 == 12U) {
-    // PD4=GND, PD5=GND, PD6=float, PD7=float
     hw_type = HW_TYPE_ASIUS;
     current_board = &board_asius;
+    // WS2812B on PB1 — configure early so led_init works
+    set_gpio_pullup(GPIOB, 1, PULL_NONE);
+    set_gpio_mode(GPIOB, 1, MODE_OUTPUT);
+    set_gpio_output_type(GPIOB, 1, OUTPUT_TYPE_PUSH_PULL);
+    register_set_bits(&(GPIOB->OSPEEDR), GPIO_OSPEEDR_OSPEED1); // very high speed
+    set_gpio_output(GPIOB, 1, 0);
   } else if (id2 == 3U) {
     hw_type = HW_TYPE_CUATRO;
     current_board = &board_cuatro;
