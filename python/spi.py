@@ -77,12 +77,19 @@ class PandaSpiTransferFailed(PandaSpiException):
 
 SPI_LOCK = threading.Lock()
 SPI_DEVICES = {}
+
+def spi_write(spi, data) -> None:
+  spi.xfer2(list(data))
+
+def spi_read(spi, length: int) -> bytes:
+  return bytes(spi.xfer2([0] * length))
+
 class SpiDevice:
   """
   Provides locked, thread-safe access to a panda's SPI interface.
   """
 
-  MAX_SPEED = 50000000  # max of the SDM845
+  MAX_SPEED = 30000000
 
   def __init__(self, speed=MAX_SPEED):
     assert speed <= self.MAX_SPEED
@@ -176,7 +183,7 @@ class PandaSpiHandle(BaseHandle):
       # read rest
       remaining = (response_len + 1) - preread_len
       if remaining > 0:
-        dat += bytes(spi.readbytes(remaining))
+        dat += spi_read(spi, remaining)
 
       dat = dat[:3 + response_len + 1]
       if self._calc_checksum(dat) != 0:
@@ -220,12 +227,12 @@ class PandaSpiHandle(BaseHandle):
   def get_protocol_version(self) -> bytes:
     vers_str = b"VERSION"
     def _get_version(spi) -> bytes:
-      spi.writebytes(vers_str)
+      spi_write(spi, vers_str)
 
       logger.debug("- waiting for echo")
       start = time.monotonic()
       while True:
-        version_bytes = spi.readbytes(len(vers_str) + 2)
+        version_bytes = spi_read(spi, len(vers_str) + 2)
         if bytes(version_bytes).startswith(vers_str):
           break
         if (time.monotonic() - start) > 0.001:
@@ -236,7 +243,7 @@ class PandaSpiHandle(BaseHandle):
         raise PandaSpiException("response length greater than max")
 
       # get response
-      dat = spi.readbytes(rlen + 1)
+      dat = spi_read(spi, rlen + 1)
       resp = dat[:-1]
       calculated_crc = crc8(bytes(version_bytes + resp))
       if calculated_crc != dat[-1]:
