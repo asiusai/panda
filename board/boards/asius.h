@@ -9,32 +9,41 @@
 // ASIUS (STM32H7) + Harness //
 // ////////////////////////// //
 
-// WS2812B on PB1 — bit-bang using DWT cycle counter at 240MHz CPU
+// WS2812B on PB1. Keep updates rare: the 24 data bits need a short critical
+// section, but the reset latch can wait with interrupts enabled.
 #define WS2812B_PIN 1U
 #define WS2812B_PORT GPIOB
 #define WS2812B_SET (1U << WS2812B_PIN)
 #define WS2812B_RST (1U << (WS2812B_PIN + 16U))
+#define WS2812B_T0H  72U
+#define WS2812B_T0L  168U
+#define WS2812B_T1H  168U
+#define WS2812B_T1L  72U
+#define WS2812B_RESET_CYCLES 72000U
+#define WS2812B_BRIGHTNESS 32U
 
-// WS2812B-2020 V1.3 timing (240MHz = 4.167ns/cycle)
-#define WS2812B_T0H  72U   // 300ns  (spec: 220-380ns)
-#define WS2812B_T0L  168U  // 700ns  (spec: 580-1000ns)
-#define WS2812B_T1H  168U  // 700ns  (spec: 580-1000ns)
-#define WS2812B_T1L  72U   // 300ns  (spec: 220-380ns)
+#define ASIUS_LED_BLUE_R 0U
+#define ASIUS_LED_BLUE_G 36U
+#define ASIUS_LED_BLUE_B 180U
 
 static void ws2812b_init_dwt(void) {
-  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-  DWT->CYCCNT = 0U;
-  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  static bool dwt_ready = false;
+  if (!dwt_ready) {
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0U;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+    dwt_ready = true;
+  }
 }
 
 static void ws2812b_send_byte(uint8_t byte) {
   for (int8_t bit = 7; bit >= 0; bit--) {
-    uint32_t t_high = ((byte >> bit) & 1U) ? WS2812B_T1H : WS2812B_T0H;
-    uint32_t t_low = ((byte >> bit) & 1U) ? WS2812B_T1L : WS2812B_T0L;
-    uint32_t start;
+    const bool one = ((byte >> bit) & 1U) != 0U;
+    const uint32_t t_high = one ? WS2812B_T1H : WS2812B_T0H;
+    const uint32_t t_low = one ? WS2812B_T1L : WS2812B_T0L;
 
     WS2812B_PORT->BSRR = WS2812B_SET;
-    start = DWT->CYCCNT;
+    uint32_t start = DWT->CYCCNT;
     while ((DWT->CYCCNT - start) < t_high) {}
 
     WS2812B_PORT->BSRR = WS2812B_RST;
@@ -43,38 +52,40 @@ static void ws2812b_send_byte(uint8_t byte) {
   }
 }
 
-static uint8_t ws2812b_rgb[3] = {0U, 0U, 0U};
+static void ws2812b_write_rgb(uint8_t red, uint8_t green, uint8_t blue) {
+  ws2812b_init_dwt();
 
-static void ws2812b_update(void) {
-  static bool dwt_ready = false;
-  if (!dwt_ready) {
-    ws2812b_init_dwt();
-    dwt_ready = true;
+  static uint8_t last_red = 0xFFU;
+  static uint8_t last_green = 0xFFU;
+  static uint8_t last_blue = 0xFFU;
+  if ((red == last_red) && (green == last_green) && (blue == last_blue)) {
+    return;
   }
-  __disable_irq();
-  ws2812b_send_byte(ws2812b_rgb[1]); // G
-  ws2812b_send_byte(ws2812b_rgb[0]); // R
-  ws2812b_send_byte(ws2812b_rgb[2]); // B
-  __enable_irq();
+
   uint32_t start = DWT->CYCCNT;
-  while ((DWT->CYCCNT - start) < 72000U) {} // reset >300µs
+  while ((DWT->CYCCNT - start) < WS2812B_RESET_CYCLES) {}
+
+  __disable_irq();
+  ws2812b_send_byte(green);
+  ws2812b_send_byte(red);
+  ws2812b_send_byte(blue);
+  __enable_irq();
+
+  last_red = red;
+  last_green = green;
+  last_blue = blue;
 }
 
-#define WS2812B_BRIGHTNESS 32U
-#define ASIUS_LED_BLUE_R 0U
-#define ASIUS_LED_BLUE_G 36U
-#define ASIUS_LED_BLUE_B 180U
-
 static void asius__set_led(uint8_t color, bool enabled) {
-  ws2812b_rgb[color] = enabled ? WS2812B_BRIGHTNESS : 0U;
-  ws2812b_update();
+  static uint8_t rgb[3] = {0U, 0U, 0U};
+  if (color < 3U) {
+    rgb[color] = enabled ? WS2812B_BRIGHTNESS : 0U;
+    ws2812b_write_rgb(rgb[0], rgb[1], rgb[2]);
+  }
 }
 
 static void asius__set_led_rgb(uint8_t red, uint8_t green, uint8_t blue) {
-  ws2812b_rgb[0] = red;
-  ws2812b_rgb[1] = green;
-  ws2812b_rgb[2] = blue;
-  ws2812b_update();
+  ws2812b_write_rgb(red, green, blue);
 }
 
 #ifndef BOOTSTUB
@@ -83,11 +94,7 @@ static void asius__set_led_fallback(bool controls_allowed, bool power_save_enabl
   UNUSED(power_save_enabled);
   UNUSED(fault_status);
 
-  static bool blink_on = false;
-  blink_on = !blink_on;
-  asius__set_led_rgb(blink_on ? ASIUS_LED_BLUE_R : 0U,
-                     blink_on ? ASIUS_LED_BLUE_G : 0U,
-                     blink_on ? ASIUS_LED_BLUE_B : 0U);
+  asius__set_led_rgb(ASIUS_LED_BLUE_R, ASIUS_LED_BLUE_G, ASIUS_LED_BLUE_B);
 }
 #endif
 
@@ -240,27 +247,6 @@ static void asius__siren_set(bool enabled) {
   }
 }
 
-static void asius__mic_init(void) {
-  set_gpio_alternate(GPIOD, 9, GPIO_AF3_DFSDM1);
-  set_gpio_alternate(GPIOD, 10, GPIO_AF3_DFSDM1);
-
-  register_set(&DFSDM1_Channel0->CHCFGR1, (90UL << DFSDM_CHCFGR1_CKOUTDIV_Pos) | DFSDM_CHCFGR1_CHEN, 0xC0FFF1EFU);
-  register_set(&DFSDM1_Channel3->CHCFGR1, (0b01UL << DFSDM_CHCFGR1_SPICKSEL_Pos) | (0b00U << DFSDM_CHCFGR1_SITP_Pos) | DFSDM_CHCFGR1_CHEN, 0x0000F1EFU);
-  register_set(&DFSDM1_Filter0->FLTFCR, (0U << DFSDM_FLTFCR_IOSR_Pos) | (54UL << DFSDM_FLTFCR_FOSR_Pos) | (4UL << DFSDM_FLTFCR_FORD_Pos), 0xE3FF00FFU);
-  register_set(&DFSDM1_Filter0->FLTCR1, DFSDM_FLTCR1_FAST | (3UL << DFSDM_FLTCR1_RCH_Pos) | DFSDM_FLTCR1_RDMAEN | DFSDM_FLTCR1_RCONT | DFSDM_FLTCR1_DFEN, 0x672E7F3BU);
-
-  register_set(&DMA1_Stream0->PAR, (uint32_t)&DFSDM1_Filter0->FLTRDATAR, 0xFFFFFFFFU);
-  register_set(&DMA1_Stream0->M0AR, (uint32_t)mic_rx_buf[0], 0xFFFFFFFFU);
-  register_set(&DMA1_Stream0->M1AR, (uint32_t)mic_rx_buf[1], 0xFFFFFFFFU);
-  DMA1_Stream0->NDTR = 512U;
-  register_set(&DMA1_Stream0->CR, DMA_SxCR_DBM | (0b10UL << DMA_SxCR_MSIZE_Pos) | (0b10UL << DMA_SxCR_PSIZE_Pos) | DMA_SxCR_MINC | DMA_SxCR_CIRC, 0x01F7FFFFU);
-  register_set(&DMAMUX1_Channel0->CCR, 101U, DMAMUX_CxCR_DMAREQ_ID_Msk);
-  register_set_bits(&DMA1_Stream0->CR, DMA_SxCR_EN);
-  DMA1->LIFCR |= 0x7DU;
-
-  register_set_bits(&DFSDM1_Channel0->CHCFGR1, DFSDM_CHCFGR1_DFSDMEN);
-  DFSDM1_Filter0->FLTCR1 |= DFSDM_FLTCR1_RSWSTART;
-}
 #endif
 
 static void asius__init(void) {
@@ -298,18 +284,6 @@ static void asius__init(void) {
 
   asius__set_amp_enabled(false);
 
-  // IMU (LSM6DS3TR-C) on I2C5: PC10=SDA, PC11=SCL, PC9=INT1
-  // TODO: I2C driver + read at 104Hz + transport over SPI/USB
-  set_gpio_alternate(GPIOC, 10, GPIO_AF4_I2C5);  // I2C5_SDA
-  set_gpio_alternate(GPIOC, 11, GPIO_AF4_I2C5);  // I2C5_SCL
-  register_set_bits(&(GPIOC->OTYPER), GPIO_OTYPER_OT10 | GPIO_OTYPER_OT11);  // open drain for I2C
-  set_gpio_mode(GPIOC, 9, MODE_INPUT);  // INT1 (EXTI)
-  set_gpio_pullup(GPIOC, 9, PULL_NONE);  // INT1 active-high, no pull needed
-
-#ifndef BOOTSTUB
-  // PDM mic (PD9=DATIN3, PD10=CKOUT)
-  asius__mic_init();
-#endif
 }
 
 
