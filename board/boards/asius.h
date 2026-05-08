@@ -114,9 +114,10 @@ static uint32_t asius__read_voltage_mV(void) {
   return adc_get_mV(&(const adc_signal_t) ADC_CHANNEL_DEFAULT(ADC1, 8)) * 11U;
 }
 
+// TODO: make bootkick work, rn it just restarted the board every x seconds
 static void asius__set_bootkick(BootState state) {
   UNUSED(state);
-  // set_gpio_output(GPIOA, 0, state != BOOT_BOOTKICK);
+  set_gpio_output(GPIOA, 0, true);
 }
 
 static void asius__set_amp_enabled(bool enabled) {
