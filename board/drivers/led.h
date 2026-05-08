@@ -20,6 +20,19 @@ void led_set(uint8_t color, bool enabled) {
   }
 }
 
+void led_set_rgb(uint8_t red, uint8_t green, uint8_t blue) {
+#if !defined(PANDA_BODY) && !defined(PANDA_JUNGLE)
+  if (current_board->set_led_rgb != NULL) {
+    current_board->set_led_rgb(red, green, blue);
+  } else
+#endif
+  {
+    led_set(LED_RED, red > 0U);
+    led_set(LED_GREEN, green > 0U);
+    led_set(LED_BLUE, blue > 0U);
+  }
+}
+
 void led_init(void) {
 #if !defined(PANDA_BODY) && !defined(PANDA_JUNGLE)
   if (current_board->set_led != NULL) {

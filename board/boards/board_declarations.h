@@ -23,6 +23,8 @@ typedef void (*board_set_bootkick)(BootState state);
 typedef bool (*board_read_som_gpio)(void);
 typedef void (*board_set_amp_enabled)(bool enabled);
 typedef void (*board_set_led)(uint8_t color, bool enabled);
+typedef void (*board_set_led_rgb)(uint8_t red, uint8_t green, uint8_t blue);
+typedef void (*board_set_led_fallback)(bool controls_allowed, bool power_save_enabled, uint8_t fault_status);
 
 struct board {
   harness_configuration *harness_config;
@@ -46,6 +48,8 @@ struct board {
   board_read_som_gpio read_som_gpio;
   board_set_amp_enabled set_amp_enabled;
   board_set_led set_led;  // NULL = use default GPIO/PWM
+  board_set_led_rgb set_led_rgb;  // NULL = map RGB to the default three LEDs
+  board_set_led_fallback set_led_fallback;  // NULL = use default panda LED behavior
 };
 
 // ******************* Definitions ********************

@@ -305,6 +305,19 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       siren_enabled = (req->param1 != 0U);
       siren_sound_id = req->param1;
       break;
+    // **** 0xf7: host RGB LED override (param1=RGB565, param2=timeout seconds, 0 disables)
+    case 0xf7:
+      if (req->param2 == 0U) {
+        led_host_controlled = false;
+      } else {
+        uint8_t red = (uint8_t)((((req->param1 >> 11) & 0x1FU) * 255U) / 31U);
+        uint8_t green = (uint8_t)((((req->param1 >> 5) & 0x3FU) * 255U) / 63U);
+        uint8_t blue = (uint8_t)(((req->param1 & 0x1FU) * 255U) / 31U);
+        led_host_controlled = true;
+        led_host_timeout = (req->param2 == 0xFFFFU) ? UINT32_MAX : (uptime_cnt + req->param2);
+        led_set_rgb(red, green, blue);
+      }
+      break;
     // **** 0xf8: disable heartbeat checks
     case 0xf8:
       if (!is_car_safety_mode(current_safety_mode)) {

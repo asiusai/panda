@@ -162,12 +162,22 @@ static void tick_handler(void) {
         print("tx3:"); puth4(can_tx3_q.r_ptr); print("-"); puth4(can_tx3_q.w_ptr); print("\n");
       #endif
 
-      // set green LED to be controls allowed
-      led_set(LED_GREEN, controls_allowed);
+      if (led_host_controlled && (led_host_timeout != UINT32_MAX) && (uptime_cnt >= led_host_timeout)) {
+        led_host_controlled = false;
+      }
 
-      // turn off the blue LED, turned on by CAN
-      // unless we are in power saving mode
-      led_set(LED_BLUE, (uptime_cnt & 1U) && power_save_enabled);
+      if (!led_host_controlled) {
+        if (current_board->set_led_fallback != NULL) {
+          current_board->set_led_fallback(controls_allowed, power_save_enabled, fault_status);
+        } else {
+          // set green LED to be controls allowed
+          led_set(LED_GREEN, controls_allowed);
+
+          // turn off the blue LED, turned on by CAN
+          // unless we are in power saving mode
+          led_set(LED_BLUE, (uptime_cnt & 1U) && power_save_enabled);
+        }
+      }
 
       const bool recent_heartbeat = heartbeat_counter == 0U;
 
@@ -347,11 +357,16 @@ int main(void) {
     }
     #endif
     if (!power_save_enabled) {
+      if (led_host_controlled || (current_board->set_led_fallback != NULL)) {
+        delay(512000U);
+        continue;
+      }
       #ifdef DEBUG_FAULTS
       if (fault_status == FAULT_STATUS_NONE) {
       #endif
         // useful for debugging, fade breaks = panda is overloaded
         for (uint32_t fade = 0U; fade < MAX_LED_FADE; fade += 1U) {
+          if (led_host_controlled) { break; }
           led_set(LED_RED, true);
           delay(fade >> 4);
           led_set(LED_RED, false);
@@ -359,6 +374,7 @@ int main(void) {
         }
 
         for (uint32_t fade = MAX_LED_FADE; fade > 0U; fade -= 1U) {
+          if (led_host_controlled) { break; }
           led_set(LED_RED, true);
           delay(fade >> 4);
           led_set(LED_RED, false);
