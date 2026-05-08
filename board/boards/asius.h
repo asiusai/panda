@@ -115,7 +115,8 @@ static uint32_t asius__read_voltage_mV(void) {
 }
 
 static void asius__set_bootkick(BootState state) {
-  set_gpio_output(GPIOA, 0, state != BOOT_BOOTKICK);
+  UNUSED(state);
+  // set_gpio_output(GPIOA, 0, state != BOOT_BOOTKICK);
 }
 
 static void asius__set_amp_enabled(bool enabled) {
