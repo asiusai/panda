@@ -167,9 +167,7 @@ static void tick_handler(void) {
       }
 
       if (!led_host_controlled) {
-        if (current_board->set_led_fallback != NULL) {
-          current_board->set_led_fallback(controls_allowed, power_save_enabled, fault_status);
-        } else {
+        if (current_board->set_led_fallback == NULL) {
           // set green LED to be controls allowed
           led_set(LED_GREEN, controls_allowed);
 
@@ -356,8 +354,13 @@ int main(void) {
       enter_stop_mode();
     }
     #endif
+    if (!led_host_controlled && (current_board->set_led_fallback != NULL)) {
+      current_board->set_led_fallback(controls_allowed, power_save_enabled, fault_status);
+      delay(1280000U);
+      continue;
+    }
     if (!power_save_enabled) {
-      if (led_host_controlled || (current_board->set_led_fallback != NULL)) {
+      if (led_host_controlled) {
         delay(512000U);
         continue;
       }

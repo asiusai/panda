@@ -61,21 +61,9 @@ static void ws2812b_update(void) {
 }
 
 #define WS2812B_BRIGHTNESS 32U
-#define ASIUS_LED_START_R 0U
-#define ASIUS_LED_START_G 36U
-#define ASIUS_LED_START_B 180U
-#define ASIUS_LED_STANDBY_R 0U
-#define ASIUS_LED_STANDBY_G 6U
-#define ASIUS_LED_STANDBY_B 32U
-#define ASIUS_LED_ENGAGED_R 0U
-#define ASIUS_LED_ENGAGED_G 180U
-#define ASIUS_LED_ENGAGED_B 35U
-#define ASIUS_LED_WARNING_R 180U
-#define ASIUS_LED_WARNING_G 80U
-#define ASIUS_LED_WARNING_B 0U
-#define ASIUS_LED_CRITICAL_R 180U
-#define ASIUS_LED_CRITICAL_G 0U
-#define ASIUS_LED_CRITICAL_B 0U
+#define ASIUS_LED_BLUE_R 0U
+#define ASIUS_LED_BLUE_G 36U
+#define ASIUS_LED_BLUE_B 180U
 
 static void asius__set_led(uint8_t color, bool enabled) {
   ws2812b_rgb[color] = enabled ? WS2812B_BRIGHTNESS : 0U;
@@ -91,19 +79,15 @@ static void asius__set_led_rgb(uint8_t red, uint8_t green, uint8_t blue) {
 
 #ifndef BOOTSTUB
 static void asius__set_led_fallback(bool controls_allowed, bool power_save_enabled, uint8_t fault_status) {
-  bool blink_on = (uptime_cnt & 1U) == 0U;
+  UNUSED(controls_allowed);
+  UNUSED(power_save_enabled);
+  UNUSED(fault_status);
 
-  if (fault_status == FAULT_STATUS_PERMANENT) {
-    asius__set_led_rgb(blink_on ? ASIUS_LED_CRITICAL_R : 0U, 0U, 0U);
-  } else if (fault_status == FAULT_STATUS_TEMPORARY) {
-    asius__set_led_rgb(blink_on ? ASIUS_LED_WARNING_R : 0U, blink_on ? ASIUS_LED_WARNING_G : 0U, 0U);
-  } else if (controls_allowed) {
-    asius__set_led_rgb(ASIUS_LED_ENGAGED_R, ASIUS_LED_ENGAGED_G, ASIUS_LED_ENGAGED_B);
-  } else if (blink_on && !power_save_enabled) {
-    asius__set_led_rgb(ASIUS_LED_START_R, ASIUS_LED_START_G, ASIUS_LED_START_B);
-  } else {
-    asius__set_led_rgb(ASIUS_LED_STANDBY_R, ASIUS_LED_STANDBY_G, ASIUS_LED_STANDBY_B);
-  }
+  static bool blink_on = false;
+  blink_on = !blink_on;
+  asius__set_led_rgb(blink_on ? ASIUS_LED_BLUE_R : 0U,
+                     blink_on ? ASIUS_LED_BLUE_G : 0U,
+                     blink_on ? ASIUS_LED_BLUE_B : 0U);
 }
 #endif
 
