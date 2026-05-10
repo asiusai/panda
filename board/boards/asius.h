@@ -121,9 +121,9 @@ static uint32_t asius__read_voltage_mV(void) {
   return adc_get_mV(&(const adc_signal_t) ADC_CHANNEL_DEFAULT(ADC1, 8)) * 11U;
 }
 
-// TODO: make bootkick work, rn it just restarted the board every x seconds
 static void asius__set_bootkick(BootState state) {
   UNUSED(state);
+  // Hold Dragon reset/wake line deasserted.
   set_gpio_output(GPIOA, 0, true);
 }
 
@@ -276,7 +276,7 @@ static void asius__init(void) {
   set_gpio_mode(GPIOC, 2, MODE_INPUT);
   set_gpio_pullup(GPIOC, 2, PULL_DOWN);
 
-  // SOM bootkick + reset lines
+  // Dragon reset/wake line
   asius__set_bootkick(BOOT_BOOTKICK);
 
   // Clock source

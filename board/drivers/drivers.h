@@ -7,12 +7,6 @@
 #include "board/stm32h7/lladc_declarations.h"
 #endif
 
-// ******************** bootkick ********************
-
-extern bool bootkick_reset_triggered;
-
-void bootkick_tick(bool ignition, bool recent_heartbeat);
-
 // ******************** can_common ********************
 
 typedef struct {

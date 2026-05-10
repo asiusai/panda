@@ -180,26 +180,27 @@ void ignition_can_hook(CANPacket_t *msg) {
       prev_counter_rivian = counter;
     }
 
-    // Tesla Model 3/Y exception
-    if ((msg->addr == 0x221U) && (len == 8)) {
-      // 0x221 overlaps with Rivian which has random data on byte 0
-      int counter = msg->data[6] >> 4;
-
-      static int prev_counter_tesla = -1;
-      if ((counter == ((prev_counter_tesla + 1) % 16)) && (prev_counter_tesla != -1)) {
-        // VCFRONT_LVPowerState->VCFRONT_vehiclePowerState
-        int power_state = (msg->data[0] >> 5U) & 0x3U;
-        ignition_can = power_state == 0x3;  // VEHICLE_POWER_STATE_DRIVE=3
-        ignition_can_cnt = 0U;
-      }
-      prev_counter_tesla = counter;
-    }
-
     // Mazda exception
     if ((msg->addr == 0x9EU) && (len == 8)) {
       ignition_can = (msg->data[0] >> 5) == 0x6U;
       ignition_can_cnt = 0U;
     }
+  }
+
+  // Tesla Model 3/Y exception. Asius sees the power-state frame on bus 2 while
+  // Tesla safety is active, so bus 0 only is not stable enough for ignition.
+  if (((msg->bus == 0U) || (msg->bus == 2U)) && (msg->addr == 0x221U) && (GET_LEN(msg) == 8)) {
+    // 0x221 overlaps with Rivian which has random data on byte 0
+    int counter = msg->data[6] >> 4;
+
+    static int prev_counter_tesla = -1;
+    if ((counter == ((prev_counter_tesla + 1) % 16)) && (prev_counter_tesla != -1)) {
+      // VCFRONT_LVPowerState->VCFRONT_vehiclePowerState
+      int power_state = (msg->data[0] >> 5U) & 0x3U;
+      ignition_can = power_state == 0x3;  // VEHICLE_POWER_STATE_DRIVE=3
+      ignition_can_cnt = 0U;
+    }
+    prev_counter_tesla = counter;
   }
 
   // body exception

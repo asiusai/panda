@@ -63,7 +63,6 @@ static void enter_stop_mode(void) {
   register_set(&(GPIOG->MODER), 0xFFFFFFFFU, 0xFFFFFFFFU);
 
   // init GPIO to lowest power state
-  current_board->set_bootkick(BOOT_STANDBY);
   current_board->set_amp_enabled(false);
   for (uint8_t i = 1U; i <= 4U; i++) {
     current_board->enable_can_transceiver(i, false);

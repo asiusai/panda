@@ -89,9 +89,11 @@ class SpiDevice:
   Provides locked, thread-safe access to a panda's SPI interface.
   """
 
-  MAX_SPEED = 30000000
+  MAX_SPEED = int(os.getenv("PANDA_SPI_SPEED", "30000000"))
 
-  def __init__(self, speed=MAX_SPEED):
+  def __init__(self, speed=None):
+    if speed is None:
+      speed = self.MAX_SPEED
     assert speed <= self.MAX_SPEED
 
     if not os.path.exists(DEV_PATH):
