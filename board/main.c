@@ -142,7 +142,11 @@ static void tick_handler(void) {
     // re-init everything that uses harness status
     if (harness.status != prev_harness_status) {
       prev_harness_status = harness.status;
-      can_set_orientation(harness.status == HARNESS_STATUS_FLIPPED);
+      bool flipped = harness.status == HARNESS_STATUS_FLIPPED;
+      if (hw_type == HW_TYPE_ASIUS) {
+        flipped = !flipped;
+      }
+      can_set_orientation(flipped);
 
       // re-init everything that uses harness status
       can_init_all();

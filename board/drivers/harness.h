@@ -66,10 +66,12 @@ static uint8_t harness_detect_orientation(void) {
     // Detect connection and orientation
     if((harness.sbu1_voltage_mV < detection_threshold) || (harness.sbu2_voltage_mV < detection_threshold)){
       if (harness.sbu1_voltage_mV < harness.sbu2_voltage_mV) {
-        // Asius v1 SBU wiring is inverted relative to comma harness orientation.
-        ret = HARNESS_STATUS_NORMAL;
-      } else {
+        // orientation flipped (PANDA_SBU1->HARNESS_SBU1(relay), PANDA_SBU2->HARNESS_SBU2(ign))
         ret = HARNESS_STATUS_FLIPPED;
+      } else {
+        // orientation normal (PANDA_SBU2->HARNESS_SBU1(relay), PANDA_SBU1->HARNESS_SBU2(ign))
+        // (SBU1->SBU2 is the normal orientation connection per USB-C cable spec)
+        ret = HARNESS_STATUS_NORMAL;
       }
     } else {
       ret = HARNESS_STATUS_NC;
