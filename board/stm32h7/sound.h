@@ -34,7 +34,7 @@ void sound_tick(void) {
 }
 
 // Recording processing
-__attribute__((unused)) static void DMA1_Stream0_IRQ_Handler(void) {
+static void DMA1_Stream0_IRQ_Handler(void) {
   DMA1->LIFCR |= 0x7DU; // clear flags
 
   uint8_t tx_buf_idx = (((BDMA_Channel1->CCR & BDMA_CCR_CT) >> BDMA_CCR_CT_Pos) == 1U) ? 0U : 1U;
@@ -56,7 +56,7 @@ __attribute__((unused)) static void DMA1_Stream0_IRQ_Handler(void) {
 }
 
 // Playback processing
-__attribute__((unused)) static void BDMA_Channel0_IRQ_Handler(void) {
+static void BDMA_Channel0_IRQ_Handler(void) {
   static uint8_t playback_buf = 0U;
 
   BDMA->IFCR |= BDMA_IFCR_CGIF0; // clear flag
@@ -143,7 +143,7 @@ void sound_init_dac(void) {
   DMA1_Stream1->CR = DMA_SxCR_DBM | (0b11UL << DMA_SxCR_PL_Pos) | (0b01UL << DMA_SxCR_MSIZE_Pos) | (0b01UL << DMA_SxCR_PSIZE_Pos) | DMA_SxCR_MINC | (1U << DMA_SxCR_DIR_Pos);
 }
 
-__attribute__((unused)) static void sound_stop_dac(void) {
+static void sound_stop_dac(void) {
   register_clear_bits(&BDMA_Channel0->CCR, BDMA_CCR_EN);
   BDMA->IFCR = 0xFFFFFFFFU;
 

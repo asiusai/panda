@@ -15,5 +15,3 @@ void uart_init(uart_ring *q, int baud) { UNUSED(q); UNUSED(baud); }
 // ********************* Globals **********************
 uint8_t hw_type = 0;
 board *current_board;
-bool siren_enabled = false;
-uint8_t siren_sound_id = 0U;

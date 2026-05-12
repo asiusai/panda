@@ -788,20 +788,8 @@ class Panda:
     return a[0]
 
   # ****************** Siren *****************
-  def set_siren(self, enabled, sound_id=1):
-    # sound_id: 0=off, 1=engage, 2=disengage, 3=prompt, 4=refuse, 5=warning_soft, 6=warning_imm
-    self._handle.controlWrite(Panda.REQUEST_OUT, 0xf6, sound_id if enabled else 0, 0, b'')
-
-  # ******************* LED ******************
-  @staticmethod
-  def pack_rgb565(red: int, green: int, blue: int) -> int:
-    return ((red & 0xF8) << 8) | ((green & 0xFC) << 3) | (blue >> 3)
-
-  def set_led_rgb(self, red: int, green: int, blue: int, timeout: int = 3):
-    self._handle.controlWrite(Panda.REQUEST_OUT, 0xf7, self.pack_rgb565(red, green, blue), timeout, b'')
-
-  def clear_led_rgb(self):
-    self._handle.controlWrite(Panda.REQUEST_OUT, 0xf7, 0, 0, b'')
+  def set_siren(self, enabled):
+    self._handle.controlWrite(Panda.REQUEST_OUT, 0xf6, int(enabled), 0, b'')
 
   # ****************** Debug *****************
 

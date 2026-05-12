@@ -1,5 +1,4 @@
 import os
-import sys
 import hashlib
 import opendbc
 import subprocess
@@ -160,13 +159,6 @@ def version_hash(path):
 hh, ch, jh = version_hash("board/health.h"), version_hash(os.path.join(opendbc.INCLUDE_PATH, "opendbc/safety/can.h")), version_hash("board/jungle/jungle_health.h")
 common_flags += [f"-DHEALTH_PACKET_VERSION=0x{hh:08X}U", f"-DCAN_PACKET_VERSION_HASH=0x{ch:08X}U",
                  f"-DJUNGLE_HEALTH_PACKET_VERSION=0x{jh:08X}U"]
-
-# Generate sound_data.h from openpilot WAV files
-sounds_dir = os.path.join(os.path.dirname(Dir('.').srcnode().abspath), "selfdrive/assets/sounds")
-if os.path.isdir(sounds_dir):
-  subprocess.check_call([sys.executable, "board/gen_sound_data.py", sounds_dir, "board/obj/sound_data.h"])
-else:
-  assert os.path.exists("board/obj/sound_data.h"), f"No WAV files at {sounds_dir} and no pre-built sound_data.h"
 
 # panda fw
 build_project("panda_h7", base_project_h7, "./board/main.c", [])

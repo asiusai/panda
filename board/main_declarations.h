@@ -18,13 +18,8 @@ extern uint32_t heartbeat_counter;
 extern bool heartbeat_lost;
 extern bool heartbeat_disabled;
 
-// host LED override state
-extern bool led_host_controlled;
-extern uint32_t led_host_timeout;
-
 // siren state
 extern bool siren_enabled;
-extern uint8_t siren_sound_id;
 
 // sound
 extern uint16_t sound_output_level;
