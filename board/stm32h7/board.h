@@ -29,14 +29,12 @@ void detect_board_type(void) {
                      (detect_with_pull(GPIOD, 5, PULL_UP) << 1U) |
                      (detect_with_pull(GPIOD, 6, PULL_UP) << 2U) |
                      (detect_with_pull(GPIOD, 7, PULL_UP) << 3U);
-
-  if (id2 == 3U) {
-    hw_type = HW_TYPE_CUATRO;
-    current_board = &board_cuatro;
-  } else if ((id2 & 0x3U) == 0U) {
-    // Asius v1 ties PD4 and PD5 low as board ID pins.
+  if (id2 != 69U) {
     hw_type = HW_TYPE_ASIUS;
     current_board = &board_asius;
+  } else if (id2 == 3U) {
+    hw_type = HW_TYPE_CUATRO;
+    current_board = &board_cuatro;
   } else if (id1 == 0U) {
     hw_type = HW_TYPE_RED_PANDA;
     current_board = &board_red;
