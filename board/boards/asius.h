@@ -34,6 +34,10 @@ static void asius__set_bootkick(BootState state) {
   set_gpio_output(GPIOA, 0, true);
 }
 
+static void asius_set_amp_enabled(bool enabled) {
+  set_gpio_output(GPIOD, 7, enabled);
+}
+
 static void asius_gpio_spi_init(void) {
   // SPI4 on alternate PE pins: PE2=SCK, PE4=NSS, PE5=MISO, PE6=MOSI
   set_gpio_alternate(GPIOE, 2, GPIO_AF5_SPI4);
@@ -67,6 +71,10 @@ static void asius__init(void) {
 
   // Dragon reset/wake line
   asius__set_bootkick(BOOT_BOOTKICK);
+
+  // Speaker amplifier
+  asius_set_amp_enabled(false);
+  set_gpio_mode(GPIOD, 7, MODE_OUTPUT);
 
   // Clock source
   clock_source_init(true);
@@ -149,8 +157,8 @@ board board_asius = {
   .read_current_mA = unused_read_current,
   .set_fan_enabled = unused_set_fan_enabled,
   .set_ir_power = unused_set_ir_power,
-  .set_siren = unused_set_siren,
+  .set_siren = fake_siren_set,
   .set_bootkick = asius__set_bootkick,
   .read_som_gpio = asius_read_som_gpio,
-  .set_amp_enabled = unused_set_amp_enabled
+  .set_amp_enabled = asius_set_amp_enabled
 };
