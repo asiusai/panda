@@ -56,25 +56,17 @@ static void ws2812_write_rgb(uint8_t red, uint8_t green, uint8_t blue) {
 
   ws2812_init_dwt();
 
-  static uint8_t last_red = 0xFFU;
-  static uint8_t last_green = 0xFFU;
-  static uint8_t last_blue = 0xFFU;
-  if ((red == last_red) && (green == last_green) && (blue == last_blue)) {
-    return;
-  }
-
   uint32_t start = DWT->CYCCNT;
   while ((DWT->CYCCNT - start) < WS2812_RESET_CYCLES) {}
 
-  disable_interrupts();
+  const uint32_t primask = __get_PRIMASK();
+  __disable_irq();
   ws2812_send_byte(green);
   ws2812_send_byte(red);
   ws2812_send_byte(blue);
-  enable_interrupts();
-
-  last_red = red;
-  last_green = green;
-  last_blue = blue;
+  if (primask == 0U) {
+    __enable_irq();
+  }
 }
 
 static void ws2812_init(void) {
