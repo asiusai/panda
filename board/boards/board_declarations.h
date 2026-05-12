@@ -22,13 +22,14 @@ typedef void (*board_set_siren)(bool enabled);
 typedef void (*board_set_bootkick)(BootState state);
 typedef bool (*board_read_som_gpio)(void);
 typedef void (*board_set_amp_enabled)(bool enabled);
+typedef void (*board_gpio_spi_init)(void);
 
 struct board {
   harness_configuration *harness_config;
   GPIO_TypeDef * const led_GPIO[3];
   const uint8_t led_pin[3];
   const uint8_t led_pwm_channels[3]; // leave at 0 to disable PWM
-  const bool has_spi;
+  board_gpio_spi_init gpio_spi_init;
   const bool has_fan;
   const uint16_t avdd_mV;
   const uint8_t fan_enable_cooldown_time;

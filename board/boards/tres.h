@@ -152,9 +152,17 @@ static harness_configuration tres_harness_config = {
   .adc_signal_SBU2 = ADC_CHANNEL_DEFAULT(ADC1, 17)
 };
 
+void tres_gpio_spi_init(void) {
+  set_gpio_alternate(GPIOE, 11, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOE, 12, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOE, 13, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOE, 14, GPIO_AF5_SPI4);
+  register_set_bits(&(GPIOE->OSPEEDR), GPIO_OSPEEDR_OSPEED11 | GPIO_OSPEEDR_OSPEED12 | GPIO_OSPEEDR_OSPEED13 | GPIO_OSPEEDR_OSPEED14);
+}
+
 board board_tres = {
   .harness_config = &tres_harness_config,
-  .has_spi = true,
+  .gpio_spi_init = tres_gpio_spi_init,
   .has_fan = true,
   .avdd_mV = 1800U,
   .fan_enable_cooldown_time = 3U,

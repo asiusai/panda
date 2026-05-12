@@ -332,8 +332,8 @@ int main(void) {
   // enable USB (right before interrupts or enum can fail!)
   usb_init();
 
-  if (current_board->has_spi) {
-    gpio_spi_init();
+  if (current_board->gpio_spi_init != NULL) {
+    current_board->gpio_spi_init();
     spi_init();
   }
 

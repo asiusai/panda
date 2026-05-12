@@ -33,6 +33,15 @@ static void asius__set_bootkick(BootState state) {
   UNUSED(state);
 }
 
+static void asius_gpio_spi_init(void) {
+  // SPI4 on alternate PE pins: PE2=SCK, PE4=NSS, PE5=MISO, PE6=MOSI
+  set_gpio_alternate(GPIOE, 2, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOE, 4, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOE, 5, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOE, 6, GPIO_AF5_SPI4);
+  register_set_bits(&(GPIOE->OSPEEDR), GPIO_OSPEEDR_OSPEED2 | GPIO_OSPEEDR_OSPEED4 | GPIO_OSPEEDR_OSPEED5 | GPIO_OSPEEDR_OSPEED6);
+}
+
 static void asius__init(void) {
   common_init_gpio();
 
@@ -124,7 +133,7 @@ static harness_configuration asius__harness_config = {
 
 board board_asius = {
   .harness_config = &asius__harness_config,
-  .has_spi = true,
+  .gpio_spi_init = asius_gpio_spi_init,
   .has_fan = false,
   .avdd_mV = 1800U,
   .fan_enable_cooldown_time = 0U,

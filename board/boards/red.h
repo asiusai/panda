@@ -114,7 +114,6 @@ static harness_configuration red_harness_config = {
 board board_red = {
   .set_bootkick = unused_set_bootkick,
   .harness_config = &red_harness_config,
-  .has_spi = false,
   .has_fan = false,
   .avdd_mV = 3300U,
   .fan_enable_cooldown_time = 0U,

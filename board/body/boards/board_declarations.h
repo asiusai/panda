@@ -8,6 +8,7 @@
 typedef void (*board_init)(void);
 typedef void (*board_init_bootloader)(void);
 typedef void (*board_enable_can_transceiver)(uint8_t transceiver, bool enabled);
+typedef void (*board_gpio_spi_init)(void);
 
 struct board {
   GPIO_TypeDef * const led_GPIO[3];
@@ -15,7 +16,7 @@ struct board {
   const uint8_t led_pwm_channels[3]; // leave at 0 to disable PWM
   board_init init;
   board_init_bootloader init_bootloader;
-  const bool has_spi;
+  board_gpio_spi_init gpio_spi_init;
 };
 
 // ******************* Definitions ********************

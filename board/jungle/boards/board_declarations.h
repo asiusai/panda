@@ -13,6 +13,7 @@ typedef void (*board_enable_can_transceiver)(uint8_t transceiver, bool enabled);
 typedef void (*board_enable_header_pin)(uint8_t pin_num, bool enabled);
 typedef float (*board_get_channel_power)(uint8_t channel);
 typedef uint16_t (*board_get_sbu_mV)(uint8_t channel, uint8_t sbu);
+typedef void (*board_gpio_spi_init)(void);
 
 struct board {
   GPIO_TypeDef * const led_GPIO[3];
@@ -33,9 +34,7 @@ struct board {
   board_enable_header_pin enable_header_pin;
   board_get_channel_power get_channel_power;
   board_get_sbu_mV get_sbu_mV;
-
-  // TODO: shouldn't need these
-  bool has_spi;
+  board_gpio_spi_init gpio_spi_init;
 };
 
 // ******************* Definitions ********************
