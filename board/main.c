@@ -167,6 +167,8 @@ static void tick_handler(void) {
         print("tx3:"); puth4(can_tx3_q.r_ptr); print("-"); puth4(can_tx3_q.w_ptr); print("\n");
       #endif
 
+      ws2812_tick();
+
       // set green LED to be controls allowed
       led_set(LED_GREEN, controls_allowed);
 

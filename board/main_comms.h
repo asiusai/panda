@@ -304,6 +304,10 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
     case 0xf6:
       siren_enabled = (req->param1 != 0U);
       break;
+    // **** 0xf7: set Asius status LED RGB565 override
+    case 0xf7:
+      ws2812_set_rgb565((uint16_t)req->param1, req->param2);
+      break;
     // **** 0xfa: play generated sound by id
     case 0xfa:
       siren_enabled = false;

@@ -8,6 +8,7 @@
 #include "board/stm32h7/lladc.h"
 #include "board/drivers/harness.h"
 #include "board/drivers/fan.h"
+#include "board/drivers/ws2812.h"
 #include "board/stm32h7/llfan.h"
 #include "board/stm32h7/sound.h"
 #include "board/drivers/fake_siren.h"

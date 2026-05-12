@@ -76,6 +76,9 @@ static void asius__init(void) {
   asius_set_amp_enabled(false);
   set_gpio_mode(GPIOD, 7, MODE_OUTPUT);
 
+  // WS2812 status LED
+  ws2812_init();
+
   // Clock source
   clock_source_init(true);
 }
