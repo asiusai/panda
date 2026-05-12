@@ -304,6 +304,12 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
     case 0xf6:
       siren_enabled = (req->param1 != 0U);
       break;
+    // **** 0xfa: play generated sound by id
+    case 0xfa:
+      siren_enabled = false;
+      current_board->set_siren(false);
+      sound_play((uint8_t)req->param1);
+      break;
     // **** 0xf8: disable heartbeat checks
     case 0xf8:
       if (!is_car_safety_mode(current_safety_mode)) {

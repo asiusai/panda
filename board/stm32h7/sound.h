@@ -7,12 +7,129 @@ __attribute__((section(".sram4"))) static uint16_t sound_tx_buf[2][SOUND_TX_BUF_
 __attribute__((section(".sram4"))) static uint32_t mic_rx_buf[2][MIC_RX_BUF_SIZE];
 __attribute__((section(".sram4"))) static uint16_t mic_tx_buf[2][MIC_TX_BUF_SIZE];
 
+#ifndef BOOTSTUB
+  #include "board/obj/sound_data.h"
+  #define SOUND_GENERATED_ENABLED
+#endif
+
 #define SOUND_IDLE_TIMEOUT 4U
+#define SOUND_PLAYBACK_SAMPLE_RATE 48000U
+#define SOUND_PLAYBACK_MAX_CHUNK 65535U
 #define MIC_SKIP_BUFFERS 2U // Skip first 2 buffers (1024 samples = ~21ms at 48kHz)
 static uint8_t sound_idle_count;
 static uint8_t mic_idle_count;
 static uint8_t mic_buffer_count;
 uint16_t sound_output_level;
+
+static void sound_stop_dac(void);
+
+#ifdef SOUND_GENERATED_ENABLED
+static const uint16_t *sound_play_data = NULL;
+static uint32_t sound_play_len = 0U;
+static uint32_t sound_play_pos = 0U;
+static bool sound_generated_playing = false;
+static bool sound_generated_interrupt_registered = false;
+
+static void sound_play_done(void) {
+  sound_generated_playing = false;
+  sound_play_data = NULL;
+  sound_play_len = 0U;
+  sound_play_pos = 0U;
+
+  register_clear_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
+  while ((DMA1_Stream1->CR & DMA_SxCR_EN) != 0U) {}
+  DMA1->LIFCR = (0x3FU << 6);
+
+  DAC1->DHR12R1 = (1UL << 11);
+  current_board->set_amp_enabled(false);
+  sound_output_level = 0U;
+}
+
+static void sound_play_next_chunk(void) {
+  if ((sound_play_data == NULL) || (sound_play_pos >= sound_play_len)) {
+    sound_play_done();
+  } else {
+    register_clear_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
+    while ((DMA1_Stream1->CR & DMA_SxCR_EN) != 0U) {}
+    DMA1->LIFCR = (0x3FU << 6);
+
+    uint32_t chunk_len = sound_play_len - sound_play_pos;
+    if (chunk_len > SOUND_PLAYBACK_MAX_CHUNK) {
+      chunk_len = SOUND_PLAYBACK_MAX_CHUNK;
+    }
+
+    register_set(&DMA1_Stream1->PAR, (uint32_t)&(DAC1->DHR12R1), 0xFFFFFFFFU);
+    register_set(&DMA1_Stream1->M0AR, (uint32_t)&sound_play_data[sound_play_pos], 0xFFFFFFFFU);
+    register_set(&DMA1_Stream1->FCR, 0U, 0x00000083U);
+    DMA1_Stream1->NDTR = chunk_len;
+    DMA1_Stream1->CR = (0b11UL << DMA_SxCR_PL_Pos) | (0b01UL << DMA_SxCR_MSIZE_Pos) |
+                       (0b01UL << DMA_SxCR_PSIZE_Pos) | DMA_SxCR_MINC |
+                       DMA_SxCR_TCIE | (1U << DMA_SxCR_DIR_Pos);
+
+    sound_play_pos += chunk_len;
+    sound_output_level = 512U;
+    register_set_bits(&DMA1_Stream1->CR, DMA_SxCR_EN);
+  }
+}
+
+static void DMA1_Stream1_IRQ_Handler(void) {
+  DMA1->LIFCR = (0x3FU << 6);
+  if (sound_generated_playing) {
+    sound_play_next_chunk();
+  }
+}
+
+static void sound_play_tim7_init(void) {
+  register_set(&TIM7->PSC, 0U, 0xFFFFU);
+  register_set(&TIM7->ARR, ((APB1_TIMER_FREQ * 1000000U) / SOUND_PLAYBACK_SAMPLE_RATE) - 1U, 0xFFFFU);
+  register_set(&TIM7->CR2, (0b10U << TIM_CR2_MMS_Pos), TIM_CR2_MMS_Msk);
+  register_set(&TIM7->CR1, TIM_CR1_ARPE | TIM_CR1_URS, 0x088EU);
+  TIM7->CNT = 0U;
+  TIM7->SR = 0U;
+  TIM7->CR1 |= TIM_CR1_CEN;
+}
+
+static void sound_play_dac_init(void) {
+  DAC1->DHR12R1 = (1UL << 11);
+  DAC1->DHR12R2 = (1UL << 11);
+  register_set(&DAC1->MCR, 0U, 0xFFFFFFFFU);
+  register_set(&DAC1->CR, DAC_CR_TEN1 | (6U << DAC_CR_TSEL1_Pos) | DAC_CR_DMAEN1, 0xFFFFFFFFU);
+  register_set_bits(&DAC1->CR, DAC_CR_EN1 | DAC_CR_EN2);
+
+  register_set(&DMAMUX1_Channel1->CCR, 67U, DMAMUX_CxCR_DMAREQ_ID_Msk);
+}
+
+void sound_play(uint8_t sound_id) {
+  if (hw_type != HW_TYPE_ASIUS) {
+    return;
+  }
+
+  if (!sound_generated_interrupt_registered) {
+    REGISTER_INTERRUPT(DMA1_Stream1_IRQn, DMA1_Stream1_IRQ_Handler, 256U, FAULT_INTERRUPT_RATE_SOUND_DMA)
+    NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+    sound_generated_interrupt_registered = true;
+  }
+
+  if ((sound_id >= OP_SOUNDS_COUNT) || (op_sounds[sound_id].data == NULL)) {
+    sound_play_done();
+  } else {
+    sound_stop_dac();
+    sound_play_data = op_sounds[sound_id].data;
+    sound_play_len = op_sounds[sound_id].len;
+    sound_play_pos = 0U;
+    sound_generated_playing = true;
+
+    sound_play_tim7_init();
+    sound_play_dac_init();
+    current_board->set_amp_enabled(true);
+    sound_play_next_chunk();
+  }
+}
+#else
+void sound_play(uint8_t sound_id) {
+  (void)sound_id;
+}
+#endif
 
 void sound_tick(void) {
   if (sound_idle_count > 0U) {
@@ -144,6 +261,10 @@ void sound_init_dac(void) {
 }
 
 static void sound_stop_dac(void) {
+#ifdef SOUND_GENERATED_ENABLED
+  sound_generated_playing = false;
+#endif
+
   register_clear_bits(&BDMA_Channel0->CCR, BDMA_CCR_EN);
   BDMA->IFCR = 0xFFFFFFFFU;
 

@@ -791,6 +791,9 @@ class Panda:
   def set_siren(self, enabled):
     self._handle.controlWrite(Panda.REQUEST_OUT, 0xf6, int(enabled), 0, b'')
 
+  def play_sound(self, sound_id):
+    self._handle.controlWrite(Panda.REQUEST_OUT, 0xfa, int(sound_id), 0, b'')
+
   # ****************** Debug *****************
 
   # arr: timer period
