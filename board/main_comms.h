@@ -153,6 +153,11 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       resp[0] = current_board->read_som_gpio();
       resp_len = 1;
       break;
+    // **** 0xc7: read Asius pairing button, shared with BOOT0 net on PB3
+    case 0xc7:
+      resp[0] = ((hw_type == HW_TYPE_ASIUS) && (get_gpio_input(GPIOB, 3) != 0)) ? 1U : 0U;
+      resp_len = 1;
+      break;
     // **** 0xd0: fetch serial (aka the provisioned dongle ID)
     case 0xd0:
       // addresses are OTP

@@ -69,6 +69,10 @@ static void asius__init(void) {
   set_gpio_mode(GPIOC, 2, MODE_INPUT);
   set_gpio_pullup(GPIOC, 2, PULL_DOWN);
 
+  // B3: pairing button sense, shared with BOOT0 net
+  set_gpio_mode(GPIOB, 3, MODE_INPUT);
+  set_gpio_pullup(GPIOB, 3, PULL_DOWN);
+
   // Dragon reset/wake line
   asius__set_bootkick(BOOT_BOOTKICK);
 
