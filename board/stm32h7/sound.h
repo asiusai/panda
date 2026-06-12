@@ -100,7 +100,7 @@ static void sound_play_dac_init(void) {
 }
 
 void sound_play(uint8_t sound_id) {
-  if (hw_type != HW_TYPE_ASIUS) {
+  if (hw_type != HW_TYPE_ONE) {
     return;
   }
 

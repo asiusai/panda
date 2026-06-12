@@ -56,8 +56,14 @@ void clock_init(void) {
     In a normal bootup, the bootstub will be the first to write this. The app section calls clock_init again, but the CR3 write will silently fail. This is fine for most cases, but caution should be taken that the bootstub and app always write the same config.
   */
 
+  // One (H725 TFBGA100 with SMPS): detect early since hw_type isn't set yet.
+  RCC->AHB4ENR |= RCC_AHB4ENR_GPIODEN;
+  __DSB();
+  bool is_one = ((GPIOD->IDR & ((1U << 4) | (1U << 5))) == 0U) &&
+                ((GPIOD->IDR & (1U << 7)) != 0U);
+
   // Set power mode to direct SMPS power supply (depends on the board layout)
-  PackageSMPSType package_smps = get_package_smps_type();
+  PackageSMPSType package_smps = is_one ? PACKAGE_WITH_SMPS : get_package_smps_type();
   if (package_smps == PACKAGE_WITHOUT_SMPS) {
     register_set(&(PWR->CR3), PWR_CR3_LDOEN, 0xFU); // no SMPS, so powered by LDO
   } else if (package_smps == PACKAGE_WITH_SMPS) {

@@ -2,11 +2,11 @@
 
 #include "board_declarations.h"
 
-// ////////////////////////// //
-// ASIUS (STM32H7) + Harness //
-// ////////////////////////// //
+// ///////////////////////// //
+// One (STM32H7) + Harness //
+// ///////////////////////// //
 
-static void asius__enable_can_transceiver(uint8_t transceiver, bool enabled) {
+static void one__enable_can_transceiver(uint8_t transceiver, bool enabled) {
   switch (transceiver) {
     case 1U:
       set_gpio_output(GPIOB, 7, !enabled);
@@ -25,20 +25,20 @@ static void asius__enable_can_transceiver(uint8_t transceiver, bool enabled) {
   }
 }
 
-static uint32_t asius__read_voltage_mV(void) {
+static uint32_t one__read_voltage_mV(void) {
   return adc_get_mV(&(const adc_signal_t) ADC_CHANNEL_DEFAULT(ADC1, 8)) * 11U;
 }
 
-static void asius__set_bootkick(BootState state) {
+static void one__set_bootkick(BootState state) {
   UNUSED(state);
   set_gpio_output(GPIOA, 0, true);
 }
 
-static void asius_set_amp_enabled(bool enabled) {
+static void one_set_amp_enabled(bool enabled) {
   set_gpio_output(GPIOD, 7, enabled);
 }
 
-static void asius_gpio_spi_init(void) {
+static void one_gpio_spi_init(void) {
   // SPI4 on alternate PE pins: PE2=SCK, PE4=NSS, PE5=MISO, PE6=MOSI
   set_gpio_alternate(GPIOE, 2, GPIO_AF5_SPI4);
   set_gpio_alternate(GPIOE, 4, GPIO_AF5_SPI4);
@@ -47,7 +47,7 @@ static void asius_gpio_spi_init(void) {
   register_set_bits(&(GPIOE->OSPEEDR), GPIO_OSPEEDR_OSPEED2 | GPIO_OSPEEDR_OSPEED4 | GPIO_OSPEEDR_OSPEED5 | GPIO_OSPEEDR_OSPEED6);
 }
 
-static void asius__init(void) {
+static void one__init(void) {
   common_init_gpio();
 
   // Power readout
@@ -73,11 +73,11 @@ static void asius__init(void) {
   set_gpio_mode(GPIOB, 3, MODE_INPUT);
   set_gpio_pullup(GPIOB, 3, PULL_DOWN);
 
-  // Asius One reset/wake line
-  asius__set_bootkick(BOOT_BOOTKICK);
+  // One reset/wake line
+  one__set_bootkick(BOOT_BOOTKICK);
 
   // Speaker amplifier
-  asius_set_amp_enabled(false);
+  one_set_amp_enabled(false);
   set_gpio_mode(GPIOD, 7, MODE_OUTPUT);
 
   // WS2812 status LED
@@ -88,13 +88,13 @@ static void asius__init(void) {
 }
 
 
-static void asius_set_can_mode(uint8_t mode) {
+static void one_set_can_mode(uint8_t mode) {
   current_board->enable_can_transceiver(2U, false);
   current_board->enable_can_transceiver(4U, false);
   switch (mode) {
     case CAN_MODE_NORMAL:
     case CAN_MODE_OBD_CAN2:
-      if ((bool)(mode == CAN_MODE_NORMAL) != (bool)(harness.status == HARNESS_STATUS_FLIPPED)) {
+      if ((bool)(mode == CAN_MODE_NORMAL) == (bool)(harness.status == HARNESS_STATUS_FLIPPED)) {
         // B12,B13: disable normal mode
         set_gpio_pullup(GPIOB, 12, PULL_NONE);
         set_gpio_mode(GPIOB, 12, MODE_ANALOG);
@@ -130,11 +130,11 @@ static void asius_set_can_mode(uint8_t mode) {
   }
 }
 
-static bool asius_read_som_gpio (void) {
+static bool one_read_som_gpio (void) {
   return (get_gpio_input(GPIOC, 2) != 0);
 }
 
-static harness_configuration asius__harness_config = {
+static harness_configuration one__harness_config = {
   .GPIO_SBU1 = GPIOC,
   .GPIO_SBU2 = GPIOA,
   .GPIO_relay_SBU1 = GPIOA,
@@ -147,25 +147,25 @@ static harness_configuration asius__harness_config = {
   .adc_signal_SBU2 = ADC_CHANNEL_DEFAULT(ADC1, 17)
 };
 
-board board_asius = {
-  .harness_config = &asius__harness_config,
-  .gpio_spi_init = asius_gpio_spi_init,
+board board_one = {
+  .harness_config = &one__harness_config,
+  .gpio_spi_init = one_gpio_spi_init,
   .has_fan = false,
   .avdd_mV = 1800U,
   .fan_enable_cooldown_time = 0U,
-  .init = asius__init,
+  .init = one__init,
   .init_bootloader = unused_init_bootloader,
-  .enable_can_transceiver = asius__enable_can_transceiver,
+  .enable_can_transceiver = one__enable_can_transceiver,
   .led_GPIO = {GPIOB, GPIOB, GPIOB},
   .led_pin = {1, 1, 1},
   .led_pwm_channels = {0, 0, 0},
-  .set_can_mode = asius_set_can_mode,
-  .read_voltage_mV = asius__read_voltage_mV,
+  .set_can_mode = one_set_can_mode,
+  .read_voltage_mV = one__read_voltage_mV,
   .read_current_mA = unused_read_current,
   .set_fan_enabled = unused_set_fan_enabled,
   .set_ir_power = unused_set_ir_power,
   .set_siren = fake_siren_set,
-  .set_bootkick = asius__set_bootkick,
-  .read_som_gpio = asius_read_som_gpio,
-  .set_amp_enabled = asius_set_amp_enabled
+  .set_bootkick = one__set_bootkick,
+  .read_som_gpio = one_read_som_gpio,
+  .set_amp_enabled = one_set_amp_enabled
 };

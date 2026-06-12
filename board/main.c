@@ -144,8 +144,8 @@ static void tick_handler(void) {
     if (harness.status != prev_harness_status) {
       prev_harness_status = harness.status;
       bool flipped = harness.status == HARNESS_STATUS_FLIPPED;
-      // needed cause asius panda has CAN lines flipped
-      if (hw_type == HW_TYPE_ASIUS) {
+      // needed cause one panda has CAN lines flipped
+      if (hw_type == HW_TYPE_ONE) {
         flipped = !flipped;
       }
       can_set_orientation(flipped);

@@ -57,7 +57,7 @@ static void ws2812_send_byte(uint8_t byte) {
 }
 
 static void ws2812_write_rgb(uint8_t red, uint8_t green, uint8_t blue) {
-  if (hw_type != HW_TYPE_ASIUS) {
+  if (hw_type != HW_TYPE_ONE) {
     return;
   }
 
@@ -78,7 +78,7 @@ static void ws2812_write_rgb(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 static void ws2812_init(void) {
-  if (hw_type != HW_TYPE_ASIUS) {
+  if (hw_type != HW_TYPE_ONE) {
     return;
   }
 
@@ -93,7 +93,7 @@ static uint8_t ws2812_clamp_channel(uint16_t channel) {
 }
 
 static void ws2812_set_rgb565(uint16_t rgb565, uint16_t timeout_seconds) {
-  if (hw_type != HW_TYPE_ASIUS) {
+  if (hw_type != HW_TYPE_ONE) {
     return;
   }
 
@@ -109,7 +109,7 @@ static void ws2812_set_rgb565(uint16_t rgb565, uint16_t timeout_seconds) {
 }
 
 static void ws2812_tick(void) {
-  if (hw_type != HW_TYPE_ASIUS) {
+  if (hw_type != HW_TYPE_ONE) {
     return;
   }
 

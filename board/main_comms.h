@@ -153,9 +153,9 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       resp[0] = current_board->read_som_gpio();
       resp_len = 1;
       break;
-    // **** 0xc7: read Asius pairing button, shared with BOOT0 net on PB3
+    // **** 0xc7: read One pairing button, shared with BOOT0 net on PB3
     case 0xc7:
-      resp[0] = ((hw_type == HW_TYPE_ASIUS) && (get_gpio_input(GPIOB, 3) != 0)) ? 1U : 0U;
+      resp[0] = ((hw_type == HW_TYPE_ONE) && (get_gpio_input(GPIOB, 3) != 0)) ? 1U : 0U;
       resp_len = 1;
       break;
     // **** 0xd0: fetch serial (aka the provisioned dongle ID)
@@ -309,7 +309,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
     case 0xf6:
       siren_enabled = (req->param1 != 0U);
       break;
-    // **** 0xf7: set Asius status LED RGB565 override
+    // **** 0xf7: set One status LED RGB565 override
     case 0xf7:
       ws2812_set_rgb565((uint16_t)req->param1, req->param2);
       break;
