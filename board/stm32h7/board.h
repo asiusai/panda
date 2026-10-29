@@ -19,6 +19,7 @@
 #include "board/boards/tres.h"
 #include "board/boards/cuatro.h"
 
+static bool cuatro_has_3v3_avdd = false;
 
 void detect_board_type(void) {
   // On STM32H7 pandas, we use two different sets of pins.
@@ -35,6 +36,11 @@ void detect_board_type(void) {
   if (id2 == 3U) {
     hw_type = HW_TYPE_CUATRO;
     current_board = &board_cuatro;
+    // Asius v6 grounds PE5 to identify its 3.3 V analog supply.
+    cuatro_has_3v3_avdd = !detect_with_pull(GPIOE, 5, PULL_UP);
+    if (cuatro_has_3v3_avdd) {
+      print("  Asius v6 ADC supply: 3300 mV\n");
+    }
   } else if ((get_package_smps_type() == PACKAGE_WITH_SMPS) && (id1 == 0U)) {
     // id1 also reads 0 on cuatro, the package tells them apart
     hw_type = HW_TYPE_RED_PANDA;
